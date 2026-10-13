@@ -1,6 +1,6 @@
 # CreatorGear Public Architecture
 
-**Status:** initial client-rendered foundation. Source structure and query intent are implemented. Live Supabase schema, anonymous RLS behavior, production hosting, and SEO output are not verified.
+**Status:** client-rendered directory and profile foundation. Directory, profile, and association query logic is implemented. Live Supabase schema, anonymous RLS behavior, production hosting, and SEO output are not verified.
 
 ## 1. System context and boundaries
 
@@ -21,10 +21,12 @@ The public app is an independent repository and deployment from `silver_admin`. 
 | --- | --- | --- |
 | `/` | Introductory discovery page | None |
 | `/creators` | Search/list published creators | `creators` |
+| `/creators/:slug` | Published creator profile and public gear associations | `creators`, active `creator_gear`, published `products` |
 | `/products` | Search/list published products and type | `products`, related `product_types` |
+| `/products/:slug` | Published product detail and public creator associations | `products`, active `creator_gear`, published `creators` |
 | `*` | Not-found page | None |
 
-Directories request up to 60 name-ordered rows, optionally use a name `ilike` filter, and show loading, configuration, error, or empty states. There is no pagination, detail route, cross-search, SSR, or server API. Filter matching is convenience, not access control.
+Directories request up to 60 name-ordered rows, optionally use a name `ilike` filter, and show loading, configuration, error, or empty states. Directories are limited to 60 rows, and cross-search, SSR, and a server API are absent. Detail routes load one record by slug and separately query active associations, filtering each related creator/product to `published`. Both association directions use separate ID-based queries: fetch active association IDs, then load only published related records. This avoids retrieving details for unpublished related records and avoids depending on undocumented nested relationship aliases. Filter matching is convenience, not access control.
 
 ## 3. Data model and data flow
 
@@ -48,11 +50,11 @@ sequenceDiagram
   UI-->>V: List, empty state, or error state
 ```
 
-The product query requests the related shape `product_types(name)`. Whether this relationship name is accepted depends on live PostgREST relationship metadata and must be confirmed. Errors currently produce a generic visitor-facing message rather than exposing database details.
+The product directory/detail query requests `product_types(name)`. Creator/product association lookups use separate table queries keyed by IDs. Product-type relationship compatibility still depends on live PostgREST metadata and must be confirmed. Errors currently produce a generic visitor-facing message rather than exposing database details.
 
 ## 4. Public data rules and security boundary
 
-The admin UI creates new creators and products with `status: draft`, and includes a creator publish action that can publish associated active products. This is evidence of an admin workflow, not proof of all public-read rules. Queries filter `creators.status` and `products.status` to `published`; no query yet includes gear associations or affiliate links, so eligibility rules for those entities remain undefined.
+The admin UI creates new creators and products with `status: draft`, and includes a creator publish action that can publish associated active products. This is evidence of an admin workflow, not proof of all public-read rules. Queries filter creators and products to `published`; association reads filter `creator_gear.status` to `active` and then retain only published related records. This is implemented query behavior, not verified public eligibility policy. Affiliate links are not queried. Validate anonymous access and visibility rules against live RLS before release.
 
 No public RLS policy has been independently inspected. Verify anonymous `SELECT` policies, table grants, related-row visibility, and RLS on every table in the live Supabase project before release. A filtered browser query cannot prevent direct API access. Never use a service-role credential in this app. No auth/session UI is present. Do not modify database schema or policies from this project without explicit scope and reviewed impact.
 
@@ -70,7 +72,7 @@ Affiliate URLs, retailer destinations, disclosure, outbound-link safety, and cli
 
 ## 8. Testing and verification strategy
 
-Implemented package scripts: `npm run build` runs TypeScript project builds and Vite production build; `npm run lint` runs Oxlint; `npm run dev` starts Vite; `npm run preview` previews `dist`. In this setup, `npm run build` passed and `npm run lint` completed successfully. The build emitted `dist/index.html`, CSS, and JavaScript bundle. No live Supabase request, browser route refresh, or production deployment was tested. Future verification should include anonymous public-data isolation, draft exclusion, relationship query behavior, error/empty states, direct route refreshes, accessibility, and production route smoke checks.
+Implemented package scripts: `npm run build` runs TypeScript project builds and Vite production build; `npm run lint` runs Oxlint; `npm run dev` starts Vite; `npm run preview` previews `dist`. Both after the initial setup and after adding detail routes, `npm run build` passed and `npm run lint` completed successfully. The latest production build emitted `dist/index.html`, CSS, and JavaScript bundle. No live Supabase request, browser route refresh, or production deployment was tested. Future verification should include anonymous public-data isolation, draft exclusion, relationship query behavior, error/empty states, direct route refreshes, accessibility, and production route smoke checks.
 
 ## 9. Architecture decisions (ADR)
 
@@ -101,17 +103,25 @@ Implemented package scripts: `npm run build` runs TypeScript project builds and 
 - **Consequences:** Host rewrite is required; dynamic metadata and initial HTML content are limited until SEO strategy is chosen.
 - **Status:** Implemented locally; Render behavior pending.
 
+### ADR-004 — Restrict profile associations to active, published records
+- **Date:** 2026-10-13
+- **Context:** Creator and product profile pages need to connect records while avoiding draft or inactive entries in their displayed result set.
+- **Decision:** Query active `creator_gear` rows and additionally filter associated creators/products to `published`; use separate ID-based reads in both directions, retrieving public fields only after applying the related record status filter.
+- **Alternatives considered:** Query all associations and rely on client filtering alone; infer a nested relationship for both directions; show unpublished related content.
+- **Reasoning:** The implementation follows documented status columns and evidenced foreign-key fields while minimizing assumptions about relationship names.
+- **Consequences:** More than one query is required. These query filters do not replace RLS and do not prove intended public eligibility.
+- **Status:** Implemented in client query code; live schema, anonymous RLS, and product-type relationship behavior remain unverified.
 ## 10. Risks, debt, and roadmap
 
 1. **Blocking release risk:** Live schema, relationship metadata, anonymous grants, and RLS remain unverified.
 2. Define publication eligibility for creator/product associations and affiliate links; test direct API access to drafts.
-3. Add profile/gear detail pages and internal linking using only verified fields.
-4. Decide safe affiliate-link presentation, disclosure, and any tracking.
-5. Add pagination/cross-search based on dataset size and query plans.
-6. Choose SEO/prerendering approach and validate metadata and structured data.
-7. Perform accessibility, responsive, performance, and browser verification.
-8. Configure Render, rewrite, environment settings, HTTPS, custom domain, rollback, and production smoke checks.
-9. Decide on analytics and privacy obligations.
+3. Decide safe affiliate-link presentation, disclosure, and any tracking.
+4. Add pagination/cross-search based on dataset size and query plans.
+5. Choose SEO/prerendering approach and validate metadata and structured data.
+6. Perform accessibility, responsive, performance, and browser verification.
+7. Configure Render, rewrite, environment settings, HTTPS, custom domain, rollback, and production smoke checks.
+8. Decide on analytics and privacy obligations.
+
 
 ## 11. Current implementation checklist
 
@@ -119,7 +129,13 @@ Implemented package scripts: `npm run build` runs TypeScript project builds and 
 - [x] Published-only creator and product list query intent.
 - [x] Search by name and basic load/error/empty/unconfigured UI states.
 - [x] `npm run build` passed; `npm run lint` completed successfully.
-- [ ] Live Supabase schema/RLS/query verification.
-- [ ] Public detail, associations, affiliate features, and SEO.
+- [x] Creator/product detail routes and association UI with published-state filters.
+- [ ] Live Supabase schema/RLS/query and association verification.
+- [ ] Affiliate features and SEO.
 - [ ] Render deployment and production verification.
+
+
+
+
+
 

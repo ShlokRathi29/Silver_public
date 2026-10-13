@@ -10,10 +10,12 @@ A separate public discovery site for creator profiles and the gear they use. It 
 
 - `/` — discovery landing page.
 - `/creators` — searches and lists published creators.
+- `/creators/:slug` — published creator profile and active associations to published gear.
 - `/products` — searches and lists published products and their product type.
+- `/products/:slug` — published product detail and active associations to published creators.
 - Unknown paths show a not-found page.
 
-Creator and product detail pages, creator-to-gear association views, product retailer/affiliate links, pagination beyond the first 60 rows, and cross-search are TODOs. There is no authentication UI; database visibility must be enforced by Supabase RLS.
+Creator and product detail pages and published creator-to-gear association views are implemented. Product retailer/affiliate links, pagination beyond the first 60 rows, cross-search, and route-specific SEO are TODOs. There is no authentication UI; database visibility must be enforced by Supabase RLS.
 
 ## Stack and structure
 
@@ -48,7 +50,7 @@ Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env.local` to the Supa
 - `npm run build` — TypeScript project check followed by production Vite build.
 - `npm run preview` — preview the built static site locally.
 
-Validation performed for this initial setup: `npm run build` passed (TypeScript and Vite production bundle), and `npm run lint` completed successfully. A live Supabase request, browser route check, and production deployment were not performed.
+Validation: `npm run build` passed after the initial setup and after adding detail routes; `npm run lint` completed successfully after both changes. Live Supabase requests, browser route checks, and production deployment were not performed.
 
 ## Data and public access assumptions
 
@@ -70,7 +72,6 @@ Only a public Supabase key belongs in browser configuration. RLS is the real pub
 
 - [ ] Verify actual Supabase schema, foreign-key relationship names, anonymous SELECT grants, and RLS policies with the project owner/database.
 - [ ] Exercise directory queries against representative published and unpublished rows; confirm all related public eligibility rules.
-- [ ] Add creator and product detail routes with eligible gear associations.
 - [ ] Establish public affiliate-link eligibility, validation, disclosure, and safe outbound behavior before rendering links.
 - [ ] Add pagination and cross-entity search after expected data volume is known.
 - [ ] Add route-specific SEO, canonical metadata, sitemap, robots policy, and structured data based on verified content.
@@ -81,8 +82,8 @@ Only a public Supabase key belongs in browser configuration. RLS is the real pub
 ## Completed in this setup
 
 - [x] Created a separate public project folder beside `silver_admin`.
-- [x] Added React/TypeScript/Vite app shell and routes for home, creator directory, gear directory, and not-found.
-- [x] Connected directory pages to the configured Supabase browser client with published-status filters and graceful request states.
+- [x] Added React/TypeScript/Vite app shell, creator/product directories and profiles, and not-found route.
+- [x] Connected creator/product directories and detail pages to Supabase with published-status filters, active association filters, and graceful request states.
 - [x] Added safe placeholder environment template and ignored local environment files.
 - [x] Recorded current design, assumptions, decisions, validations, and remaining work in both root documents.
 
@@ -94,4 +95,6 @@ Only a public Supabase key belongs in browser configuration. RLS is the real pub
 - **Build fails:** run `npm install`, then `npm run build`; ensure Node supports the installed Vite version.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for data flow, security boundaries, decisions, risks, and architectural roadmap.
+
+
 
